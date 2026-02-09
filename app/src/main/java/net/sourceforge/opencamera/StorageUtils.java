@@ -1686,4 +1686,71 @@ public class StorageUtils {
         }
         return -1;
     }
+
+    /** Checks if the URI is safe to write to.
+     *  It checks if the URI points to a file that is within the application's private data directory.
+     */
+    boolean isUriSafe(Uri uri) {
+        if( MyDebug.LOG )
+            Log.d(TAG, "isUriSafe: " + uri);
+        if( uri == null )
+            return false;
+        String scheme = uri.getScheme();
+        String path = null;
+        if( scheme != null && scheme.equalsIgnoreCase("file") ) {
+            path = uri.getPath();
+        }
+        else if( scheme != null && scheme.equalsIgnoreCase("content") ) {
+            // try to resolve path
+            path = getDataColumn(uri, null, null);
+        }
+
+        if( path != null ) {
+            String dataDir = context.getApplicationInfo().dataDir;
+            return isPathSafe(path, dataDir);
+        }
+
+        return true;
+    }
+
+    /** Visible for testing.
+     *  Checks if the path is safe (i.e. not inside the dataDir).
+     */
+    public boolean isPathSafe(String path, String dataDir) {
+        if( MyDebug.LOG ) {
+            Log.d(TAG, "isPathSafe: " + path);
+            Log.d(TAG, "dataDir: " + dataDir);
+        }
+        if( path == null )
+            return true; // Can't check, assume safe (or handled elsewhere)
+        if( dataDir == null )
+            return true; // Can't check
+
+        try {
+            File file = new File(path);
+            File dataDirFile = new File(dataDir);
+            // We use canonical paths to resolve .. etc
+            String canonicalPath = file.getCanonicalPath();
+            String canonicalDataDir = dataDirFile.getCanonicalPath();
+
+            // Check if canonicalPath starts with canonicalDataDir
+            // We append File.separator to ensure we don't match partial directory names (e.g. /data/data/com.foo vs /data/data/com.foobar)
+            if( !canonicalDataDir.endsWith(File.separator) )
+                canonicalDataDir += File.separator;
+
+            if( canonicalPath.startsWith(canonicalDataDir) ) {
+                if( MyDebug.LOG )
+                    Log.e(TAG, "path is inside dataDir: " + canonicalPath);
+                return false;
+            }
+        }
+        catch(IOException e) {
+            MyDebug.logStackTrace(TAG, "failed to get canonical path", e);
+            // If we can't get canonical path, checking is hard.
+            // If path contains "..", it might be an attack.
+            if( path.contains("..") )
+                return false;
+        }
+        return true;
+    }
 }

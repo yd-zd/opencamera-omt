@@ -8,7 +8,7 @@ public class MyDebug {
     /** Global constant to control logging, should always be set to false in
      *  released versions.
      */
-    public static final boolean LOG = true;
+    public static final boolean LOG = false;
 
     /** Wrapper to print exceptions, should use instead of e.printStackTrace().
      */

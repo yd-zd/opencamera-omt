@@ -2,7 +2,11 @@ apply plugin: 'com.android.application'
 
 android {
     compileSdk 35
-    compileOptions.encoding = 'UTF-8'
+    compileOptions {
+        encoding = 'UTF-8'
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
 
     defaultConfig {
         applicationId "io.github.ysdede.opencameraomt"
@@ -104,10 +108,4 @@ dependencies {
     androidTestImplementation "androidx.test:runner:1.7.0"
     androidTestImplementation "androidx.test:rules:1.7.0"
     androidTestImplementation "androidx.test.espresso:espresso-core:3.7.0"
-}
-
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
-    }
 }

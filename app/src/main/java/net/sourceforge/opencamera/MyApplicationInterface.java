@@ -337,7 +337,13 @@ public class MyApplicationInterface extends BasicApplicationInterface {
                 if (intent_uri != null) {
                     if (MyDebug.LOG)
                         Log.d(TAG, "save to: " + intent_uri);
-                    return VideoMethod.URI;
+                    if (!storageUtils.isUriSafe(intent_uri)) {
+                        Log.e(TAG, "not saving to intent_uri as it is not safe: " + intent_uri);
+                        intent_uri = null;
+                    }
+                    else {
+                        return VideoMethod.URI;
+                    }
                 }
             }
             // if no EXTRA_OUTPUT, we should save to standard location, and will pass back

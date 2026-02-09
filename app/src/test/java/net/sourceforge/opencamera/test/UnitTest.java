@@ -4,6 +4,7 @@ import android.media.CamcorderProfile;
 
 import net.sourceforge.opencamera.MainActivity;
 import net.sourceforge.opencamera.MyApplicationInterface;
+import net.sourceforge.opencamera.StorageUtils;
 import net.sourceforge.opencamera.cameracontroller.CameraController;
 import net.sourceforge.opencamera.cameracontroller.CameraController2;
 import net.sourceforge.opencamera.HDRProcessor;
@@ -1260,5 +1261,19 @@ public class UnitTest {
 
         assertFalse(CameraController2.sizeSubset(new int[]{1920, 1280}, new int[]{1080, 720}, new int[]{1920}, new int[]{1080}));
         assertFalse(CameraController2.sizeSubset(new int[]{1920, 1280}, new int[]{1080, 720}, new int[]{2380}, new int[]{720}));
+    }
+
+    @Test
+    public void testSanitizeFilenamePrefix() {
+        Log.d(TAG, "testSanitizeFilenamePrefix");
+        assertEquals("", StorageUtils.sanitizeFilenamePrefix(null));
+        assertEquals("", StorageUtils.sanitizeFilenamePrefix(""));
+        assertEquals("IMG_", StorageUtils.sanitizeFilenamePrefix("IMG_"));
+        assertEquals(".._IMG_", StorageUtils.sanitizeFilenamePrefix("../IMG_"));
+        assertEquals(".._IMG_", StorageUtils.sanitizeFilenamePrefix("..\\IMG_"));
+        assertEquals("fold_er", StorageUtils.sanitizeFilenamePrefix("fold/er"));
+        assertEquals("fold_er", StorageUtils.sanitizeFilenamePrefix("fold\\er"));
+        assertEquals("test_path_traversal", StorageUtils.sanitizeFilenamePrefix("test/path/traversal"));
+        assertEquals("test_path_traversal", StorageUtils.sanitizeFilenamePrefix("test\\path\\traversal"));
     }
 }

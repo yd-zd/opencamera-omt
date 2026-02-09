@@ -680,6 +680,18 @@ public class StorageUtils {
         return result;
     }
 
+    /** Sanitizes a string for use as a filename prefix, ensuring it doesn't contain
+     *  path separators.
+     */
+    public static String sanitizeFilenamePrefix(String prefix) {
+        if( prefix == null )
+            return "";
+        // we can't have slashes in the filename
+        prefix = prefix.replace('/', '_');
+        prefix = prefix.replace('\\', '_');
+        return prefix;
+    }
+
     String createMediaFilename(int type, String suffix, int count, String extension, Date current_date) {
         String index = "";
         if( count > 0 ) {
@@ -707,11 +719,13 @@ public class StorageUtils {
             case MEDIA_TYPE_PRESHOT: // preshot videos still use same prefix as photos
             case MEDIA_TYPE_IMAGE: {
                 String prefix = sharedPreferences.getString(PreferenceKeys.SavePhotoPrefixPreferenceKey, "IMG_");
+                prefix = sanitizeFilenamePrefix(prefix);
                 mediaFilename = prefix + timeStamp + suffix + index + extension;
                 break;
             }
             case MEDIA_TYPE_VIDEO: {
                 String prefix = sharedPreferences.getString(PreferenceKeys.SaveVideoPrefixPreferenceKey, "VID_");
+                prefix = sanitizeFilenamePrefix(prefix);
                 mediaFilename = prefix + timeStamp + suffix + index + extension;
                 break;
             }

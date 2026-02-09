@@ -2971,6 +2971,8 @@ public class JavaImageFunctions {
         private final Bitmap bitmap_in;
         private final int width, height;
         private JavaImageProcessing.FastAccessBitmap [] fast_bitmap_in;
+        private int [][] cache_bitmap_Ix;
+        private int [][] cache_bitmap_Iy;
 
         ComputeDerivativesFunction(Bitmap bitmap_Ix, Bitmap bitmap_Iy, Bitmap bitmap_in) {
             this.bitmap_Ix = bitmap_Ix;
@@ -2983,6 +2985,8 @@ public class JavaImageFunctions {
         @Override
         public void init(int n_threads) {
             fast_bitmap_in = new JavaImageProcessing.FastAccessBitmap[n_threads];
+            cache_bitmap_Ix = new int[n_threads][];
+            cache_bitmap_Iy = new int[n_threads][];
 
             for(int i=0;i<n_threads;i++) {
                 fast_bitmap_in[i] = new JavaImageProcessing.FastAccessBitmap(bitmap_in);
@@ -2992,8 +2996,15 @@ public class JavaImageFunctions {
         @Override
         public void apply(JavaImageProcessing.CachedBitmap output, int thread_index, int off_x, int off_y, int this_width, int this_height) {
             // we could move these to class members for performance, remember we'd have to have a version per-thread
-            int [] cache_bitmap_Ix = new int[this_width*this_height];
-            int [] cache_bitmap_Iy = new int[this_width*this_height];
+            int required_size = this_width * this_height;
+            if (cache_bitmap_Ix[thread_index] == null || cache_bitmap_Ix[thread_index].length < required_size) {
+                cache_bitmap_Ix[thread_index] = new int[required_size];
+            }
+            if (cache_bitmap_Iy[thread_index] == null || cache_bitmap_Iy[thread_index].length < required_size) {
+                cache_bitmap_Iy[thread_index] = new int[required_size];
+            }
+            int [] current_cache_Ix = cache_bitmap_Ix[thread_index];
+            int [] current_cache_Iy = cache_bitmap_Iy[thread_index];
 
             for(int y=off_y,c=0;y<off_y+this_height;y++) {
 
@@ -3041,13 +3052,13 @@ public class JavaImageFunctions {
 
                     //bitmap_Ix.setPixel(x, y, Ix << 24);
                     //bitmap_Iy.setPixel(x, y, Iy << 24);
-                    cache_bitmap_Ix[c] = Ix << 24;
-                    cache_bitmap_Iy[c] = Iy << 24;
+                    current_cache_Ix[c] = Ix << 24;
+                    current_cache_Iy[c] = Iy << 24;
                 }
             }
 
-            bitmap_Ix.setPixels(cache_bitmap_Ix, 0, this_width, off_x, off_y, this_width, this_height);
-            bitmap_Iy.setPixels(cache_bitmap_Iy, 0, this_width, off_x, off_y, this_width, this_height);
+            bitmap_Ix.setPixels(current_cache_Ix, 0, this_width, off_x, off_y, this_width, this_height);
+            bitmap_Iy.setPixels(current_cache_Iy, 0, this_width, off_x, off_y, this_width, this_height);
         }
 
         @Override

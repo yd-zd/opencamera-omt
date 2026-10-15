@@ -304,28 +304,11 @@ echo "== aligned-stride: the codec may only touch the buffer it actually owns ==
 # -I order puts that copy's HEADERS ahead of the tree's, so a mutant that edits
 # vmxcodec_common.h — where the aligned-stride helpers live — is really what gets compiled.
 build_and_run_codec() { # <name> <test.cpp> <vmx-src-dir> <expect pass|fail>
-# Codec-only builder for this scenario: the test drives ThreadTask straight out of the header, and
-# the -I order puts the copy's headers ahead of the tree's so a mutant that edits thread_tasks.h is
-# really what gets compiled. Named for this section: the sibling branches add their own, so each
-# section stays independently mergeable.
-build_and_run_threadtask() { # <name> <test.cpp> <vmx-src-dir> <expect pass|fail>
   local name=$1 test=$2 vmxdir=$3 expect=$4
   rm -f "$SCRATCH/$name"
   # shellcheck disable=SC2086
   $CXX $FLAGS -I"$vmxdir" $INC "$test" \
        "$vmxdir/vmxcodec.cpp" "$vmxdir/vmxcodec_x86.cpp" "$vmxdir/vmxcodec_avx2.cpp" \
-# Channel scenarios, with the HEADERS taken from the same copy as the sources. build_and_run resolves
-# includes against the tree, which is fine while a mutant changes only .cpp; here the pre-fix copy
-# changes Channel's member layout (sendSocketMutex_ is a member), and a test built against the tree's
-# header while linking the copy's .cpp reads members at the wrong offsets — the counters came back as
-# -4702111234474983746 the first time, which is not evidence of anything.
-build_and_run_channel() { # <name> <test.cpp> <omt-src-dir> <expect pass|fail>
-  local name=$1 test=$2 srcdir=$3 expect=$4
-  rm -f "$SCRATCH/$name"
-  # shellcheck disable=SC2086
-  $CXX $FLAGS -I"$srcdir" $INC "$test" "$srcdir/OMTChannel.cpp" "$srcdir/OMTAsyncPool.cpp" \
-       "$srcdir/OMTSender.cpp" "$srcdir/OMTDiscovery.cpp" \
-       "$ROOT/libvmx/src/vmxcodec.cpp" "$ROOT/libvmx/src/vmxcodec_x86.cpp" "$ROOT/libvmx/src/vmxcodec_avx2.cpp" \
        -o "$SCRATCH/$name" 2>"$SCRATCH/$name.build.log"
   if [ $? -ne 0 ] || [ ! -x "$SCRATCH/$name" ]; then
     echo "  $name: BUILD FAILED (refusing to score an absent run)"
@@ -386,6 +369,27 @@ assert s.count(old) == 1, "Free ownership predicate not found"
 open(p, "w").write(s.replace(old, "\tif (true)  // MUTANT: ownership ignored\n\t{\n\t\tfree(aligned);\n\t}", 1))
 PY
 build_and_run_codec as-mutant-free-always "$ROOT/qa/aligned-stride.cpp" "$MA3" fail
+
+echo
+# Codec-only builder for this scenario: the test drives ThreadTask straight out of the header, and
+# the -I order puts the copy's headers ahead of the tree's so a mutant that edits thread_tasks.h is
+# really what gets compiled. Named for this section: the sibling branches add their own, so each
+# section stays independently mergeable.
+build_and_run_threadtask() { # <name> <test.cpp> <vmx-src-dir> <expect pass|fail>
+  local name=$1 test=$2 vmxdir=$3 expect=$4
+  rm -f "$SCRATCH/$name"
+  # shellcheck disable=SC2086
+  $CXX $FLAGS -I"$vmxdir" $INC "$test" \
+       "$vmxdir/vmxcodec.cpp" "$vmxdir/vmxcodec_x86.cpp" "$vmxdir/vmxcodec_avx2.cpp" \
+       -o "$SCRATCH/$name" 2>"$SCRATCH/$name.build.log"
+  if [ $? -ne 0 ] || [ ! -x "$SCRATCH/$name" ]; then
+    echo "  $name: BUILD FAILED (refusing to score an absent run)"
+    sed 's/^/      /' "$SCRATCH/$name.build.log" | head -10
+    rc=1; return
+  fi
+  score_run "$name" "$expect"
+}
+
 echo "== thread-task-join: Join() waits for the work, Destroy() waits for the thread =="
 build_and_run_threadtask tt-fixed "$ROOT/qa/thread-task-join.cpp" "$ROOT/libvmx/src" pass
 
@@ -435,6 +439,29 @@ new = ("\tvoid TaskLoop()\n\t{\n\t\twhile (running)  // MUTANT: read outside mtx
 open(p, "w").write(s[:i] + new + s[j:])
 PY
 build_and_run_threadtask tt-mutant-running-outside-lock "$ROOT/qa/thread-task-join.cpp" "$MJ2" fail
+
+echo
+# Channel scenarios, with the HEADERS taken from the same copy as the sources. build_and_run resolves
+# includes against the tree, which is fine while a mutant changes only .cpp; here the pre-fix copy
+# changes Channel's member layout (sendSocketMutex_ is a member), and a test built against the tree's
+# header while linking the copy's .cpp reads members at the wrong offsets — the counters came back as
+# -4702111234474983746 the first time, which is not evidence of anything.
+build_and_run_channel() { # <name> <test.cpp> <omt-src-dir> <expect pass|fail>
+  local name=$1 test=$2 srcdir=$3 expect=$4
+  rm -f "$SCRATCH/$name"
+  # shellcheck disable=SC2086
+  $CXX $FLAGS -I"$srcdir" $INC "$test" "$srcdir/OMTChannel.cpp" "$srcdir/OMTAsyncPool.cpp" \
+       "$srcdir/OMTSender.cpp" "$srcdir/OMTDiscovery.cpp" \
+       "$ROOT/libvmx/src/vmxcodec.cpp" "$ROOT/libvmx/src/vmxcodec_x86.cpp" "$ROOT/libvmx/src/vmxcodec_avx2.cpp" \
+       -o "$SCRATCH/$name" 2>"$SCRATCH/$name.build.log"
+  if [ $? -ne 0 ] || [ ! -x "$SCRATCH/$name" ]; then
+    echo "  $name: BUILD FAILED (refusing to score an absent run)"
+    sed 's/^/      /' "$SCRATCH/$name.build.log" | head -10
+    rc=1; return
+  fi
+  score_run "$name" "$expect"
+}
+
 echo "== socket-write-order: one writer per channel, one deadline per write =="
 build_and_run_channel sw-fixed "$ROOT/qa/socket-write-order.cpp" "$ROOT/libomt/cpp" pass
 

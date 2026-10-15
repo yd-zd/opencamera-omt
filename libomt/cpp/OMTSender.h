@@ -19,6 +19,7 @@
 #include <memory>
 #include <string>
 #include <functional>
+#include <cstddef>
 
 #include "OMTConstants.h"
 #include "OMTChannel.h"
@@ -113,6 +114,13 @@ public:
     }
     /// Frames the encoder refused. Without this they left the camera and were counted nowhere.
     long long encodeFailures() const { return encodeFailures_.load(); }
+
+    /// Test seam for qa/vmx-saveto-contract.cpp: the encode-length gate is pure, so the suite can
+    /// assert the boundary directly instead of waiting for the codec to misbehave. Nothing in the
+    /// production path calls it.
+    static bool encodedLenAcceptableForTest(int encodedLen, size_t capacity) {
+        return encodedLenAcceptable(encodedLen, capacity);
+    }
     /// Drops across all subscribers since the previous call (per-second congestion view).
     int64_t getRecentDropsAndReset();
     
@@ -217,6 +225,8 @@ private:
     void createEncoder(int width, int height, int frameRate, int colorSpace);
     void destroyEncoder();
     int encodeFrame(const MediaFrame& frame);
+    // P0 #10: what VMX_SaveTo() is allowed to hand back for it to be published as a frame at all.
+    static bool encodedLenAcceptable(int encodedLen, size_t capacity);
     
     // Buffer size calculation
     static int calculateOptimalBuffer(int width, int height, int profile);
